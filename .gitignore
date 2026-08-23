@@ -1,0 +1,25 @@
+# Virtual environment — like node_modules, never commit it
+venv/
+env/
+.venv/
+
+# Python bytecode cache — auto-generated, like a .DS_Store equivalent
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables — same rule as .env in any Node project
+.env
+.env.local
+
+# pytest cache
+.pytest_cache/
+
+# Editor/OS junk
+.vscode/
+.idea/
+.DS_Store
+
+# Coverage reports if you generate any
+.coverage
+htmlcov/
