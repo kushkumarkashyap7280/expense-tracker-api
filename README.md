@@ -137,3 +137,35 @@ Tests run against a `FakeExpenseRepository` — no real database needed, no mock
 
 - **`test_expense_service.py`** — 17 unit tests covering service-layer logic in isolation
 - **`test_expense_router.py`** — 16 integration tests via `TestClient` with `dependency_overrides`
+
+## Running with Docker (e.g. on Azure VM)
+
+### 1. Build and run using Docker Compose
+
+```bash
+# Start container in background with auto-restart
+docker compose up -d --build
+```
+
+### 2. Or using standard Docker commands
+
+```bash
+# Build the image
+docker build -t expense-tracker-api .
+
+# Run the container
+docker run -d \
+  --name expense-tracker-api \
+  -p 8000:8000 \
+  --env-file .env \
+  --restart unless-stopped \
+  expense-tracker-api
+```
+
+Check container status & logs:
+```bash
+docker logs -f expense-tracker-api
+```
+
+> **Azure VM Tip:** Make sure port `8000` (or `80`/`443` if using Nginx reverse proxy) is allowed in your Azure VM's **Network Security Group (NSG) Inbound port rules**.
+
