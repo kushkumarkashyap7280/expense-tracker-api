@@ -2,6 +2,12 @@
 
 A FastAPI-based expense tracking REST API demonstrating **clean layered architecture** with proper separation of concerns, dependency injection, and testability.
 
+##  Live Demo & API Documentation
+
+- **Interactive Swagger UI**: [http://20.2.250.240:8000/docs](http://20.2.250.240:8000/docs)
+- **ReDoc UI**: [http://20.2.250.240:8000/redoc](http://20.2.250.240:8000/redoc)
+- **Base URL**: `http://20.2.250.240:8000`
+
 ## Architecture
 
 ```
