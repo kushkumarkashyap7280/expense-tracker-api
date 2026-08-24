@@ -26,35 +26,44 @@ SupabaseExpenseRepository (Supabase / Postgres)
 |-------|------|----------------|
 | **Schemas** | `schemas.py` | HTTP contract — request/response shapes (Pydantic) |
 | **Models** | `models.py` | Domain model — internal shape, transport-agnostic |
-| **Repository** | `repository.py` | Abstract data access interface |
+| **Repository** | `repository.py` | Abstract data access interface (`ABC`) |
 | **Supabase Repo** | `supabase_repository.py` | Concrete implementation backed by Supabase Postgres |
-| **Exceptions** | `exceptions.py` | Domain exceptions — raised by service, never `HTTPException` |
-| **Service** | `service.py` | All business logic, including summary aggregation |
-| **Router** | `router.py` | Thin HTTP adapter — parse, delegate, translate exceptions |
+| **Exceptions** | `exceptions.py` | Domain exceptions — raised by service, translated to `HTTPException` by router |
+| **Service** | `service.py` | All business logic, summary aggregation math, validation rules |
+| **Router** | `router.py` | Thin HTTP adapter — parse, delegate, translate exceptions, return schemas |
 | **Dependencies** | `dependencies.py` | DI wiring via FastAPI `Depends` |
 | **Config** | `config.py` | `pydantic-settings` reading from `.env` |
 
 ### Key Design Decisions
 
-- **Repository pattern with ABC interface** — decouples service logic from the data store; makes it easy to swap implementations or test with fakes.
-- **Service layer owns all business logic** — summary aggregation, validation, and error handling happen here, not in the router.
-- **Domain exceptions** — the service raises `ExpenseNotFoundError` (not `HTTPException`), keeping it transport-agnostic. The router catches and translates.
-- **Constructor injection** — `ExpenseService` receives its repository via constructor, wired through FastAPI's `Depends` chain.
-- **Test fakes** — tests use a `FakeExpenseRepository` (defined in test code only) that satisfies the same abstract interface — no mocking of owned code.
+- **Repository Pattern with ABC Interface**: Decouples business logic from database operations, making it trivial to swap storage engines or test with fast in-memory fakes.
+- **Dual Pagination Strategies**:
+  - **Offset Pagination (`GET /expenses`)**: Standard `skip` & `limit` for traditional numbered pages.
+  - **Cursor-Based Pagination (`GET /expenses/cursor`)**: Uses indexed seek (`id > cursor_id`) with the `limit + 1` trick for $O(1)$ performance on large datasets and data-drift prevention in infinite scroll feeds.
+- **Domain Exception Hierarchy**: The service raises domain exceptions (`ExpenseNotFoundError`, `FutureDateError`, `InvalidDateRangeError`), keeping it 100% transport-agnostic. The router catches and translates them into appropriate HTTP status codes (404, 400).
+- **Service Layer Aggregation & Precision**: Monthly summary calculation runs in the service layer (not a DB passthrough) and applies currency rounding (`round(..., 2)`) to eliminate floating-point precision errors.
+- **Constructor Injection & FastAPI `Depends`**: `ExpenseService` receives its repository via constructor, wired through FastAPI's dependency injection chain.
+- **Test Fakes (No Mocking of Owned Code)**: Tests use a `FakeExpenseRepository` in memory, ensuring test speed (~0.5s) and zero reliance on live third-party network connections.
 
 ## Project Structure
 
 ```
 expense-tracker-api/
-├── .env.example          # Placeholder environment config
+├── .github/
+│   └── workflows/
+│       └── deploy.yml            # CI/CD pipeline (Tests + Auto-deploy to Azure VM)
+├── .dockerignore
+├── .env.example                  # Placeholder environment config
 ├── .gitignore
+├── Dockerfile                    # Production container image
+├── docker-compose.yml            # Compose service with auto-restart
 ├── README.md
 ├── requirements.txt
-├── plan.md               # Architecture plan and progress
+├── plan.md                       # Architecture plan
 ├── app/
 │   ├── __init__.py
-│   ├── main.py           # FastAPI app entry point
-│   ├── config.py         # pydantic-settings config
+│   ├── main.py                   # FastAPI app entry point
+│   ├── config.py                 # pydantic-settings config
 │   ├── database/
 │   │   ├── __init__.py
 │   │   └── supabase_client.py
@@ -71,21 +80,22 @@ expense-tracker-api/
 │           └── router.py
 └── tests/
     ├── __init__.py
-    ├── conftest.py               # FakeExpenseRepository for tests
-    ├── test_expense_service.py   # Unit tests (service layer)
-    └── test_expense_router.py    # Integration tests (TestClient)
+    ├── conftest.py               # FakeExpenseRepository & fixtures for tests
+    ├── test_expense_service.py   # Unit tests (service layer in isolation)
+    └── test_expense_router.py    # Integration tests (TestClient HTTP flow)
 ```
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/expenses` | Create a new expense |
-| `GET` | `/expenses` | List expenses (filterable by category, date range; paginated) |
-| `GET` | `/expenses/{id}` | Get a single expense by ID |
-| `PUT` | `/expenses/{id}` | Partial update an expense |
-| `DELETE` | `/expenses/{id}` | Delete an expense |
-| `GET` | `/expenses/summary?year=&month=` | Monthly spending summary with category breakdown |
+| Method | Path | Query / Body Params | Description |
+|--------|------|---------------------|-------------|
+| `POST` | `/expenses` | JSON body (`ExpenseCreate`) | Create a new expense |
+| `GET` | `/expenses` | `category`, `date_from`, `date_to`, `skip`, `limit` | List expenses (offset paginated & filterable) |
+| `GET` | `/expenses/cursor` | `cursor_id`, `category`, `date_from`, `date_to`, `limit` | High-performance cursor-based pagination |
+| `GET` | `/expenses/summary` | `year`, `month` | Monthly spending summary with category breakdown |
+| `GET` | `/expenses/{id}` | `expense_id` | Get a single expense by ID (or 404) |
+| `PUT` | `/expenses/{id}` | `expense_id`, JSON (`ExpenseUpdate`) | Partial update an expense |
+| `DELETE` | `/expenses/{id}` | `expense_id` | Delete an expense |
 
 ## Setup
 
@@ -109,12 +119,13 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env with your Supabase project URL and API key
+# Edit .env with your Supabase project URL and Service Role Key
 ```
 
-Create an `expenses` table in your Supabase project:
+Create the `expenses` table and performance indexes in Supabase SQL Editor:
 
 ```sql
+-- Table definition
 CREATE TABLE expenses (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -123,9 +134,13 @@ CREATE TABLE expenses (
   date DATE NOT NULL,
   description TEXT
 );
+
+-- Performance Indexes
+CREATE INDEX idx_expenses_date ON expenses (date);
+CREATE INDEX idx_expenses_category_date ON expenses (category, date);
 ```
 
-### 4. Run the server
+### 4. Run the server locally
 
 ```bash
 uvicorn app.main:app --reload
@@ -139,10 +154,10 @@ API docs available at: [http://localhost:8000/docs](http://localhost:8000/docs)
 pytest tests/ -v
 ```
 
-Tests run against a `FakeExpenseRepository` — no real database needed, no mocking of owned code.
+All **39 automated tests** run against an in-memory `FakeExpenseRepository` — fast (~0.5s), isolated, and 100% deterministic:
 
-- **`test_expense_service.py`** — 17 unit tests covering service-layer logic in isolation
-- **`test_expense_router.py`** — 16 integration tests via `TestClient` with `dependency_overrides`
+- **`test_expense_service.py`** — 20 unit tests covering service logic, exceptions, math, and cursor pagination in isolation.
+- **`test_expense_router.py`** — 19 integration tests via `TestClient` verifying the full HTTP request/response pipeline and status codes.
 
 ## Running with Docker (e.g. on Azure VM)
 
@@ -173,5 +188,8 @@ Check container status & logs:
 docker logs -f expense-tracker-api
 ```
 
-> **Azure VM Tip:** Make sure port `8000` (or `80`/`443` if using Nginx reverse proxy) is allowed in your Azure VM's **Network Security Group (NSG) Inbound port rules**.
+## CI/CD Pipeline (GitHub Actions)
 
+A complete automated CI/CD pipeline is configured in `.github/workflows/deploy.yml`:
+1. On every `git push` to `main`, GitHub Actions automatically installs dependencies and runs the entire **39-test test suite**.
+2. If all tests pass, GitHub Actions connects to the **Azure VM via SSH**, pulls the latest changes, and rebuilds the Docker container with zero downtime.
