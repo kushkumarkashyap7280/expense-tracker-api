@@ -2,7 +2,11 @@ from datetime import date
 
 import pytest
 
-from app.features.expenses.exceptions import ExpenseNotFoundError
+from app.features.expenses.exceptions import (
+    ExpenseNotFoundError,
+    FutureDateError,
+    InvalidDateRangeError,
+)
 from app.features.expenses.schemas import ExpenseCreate, ExpenseUpdate
 from app.features.expenses.service import ExpenseService
 from tests.conftest import FakeExpenseRepository
@@ -85,6 +89,12 @@ class TestListExpenses:
         )
         assert len(result) == 2
 
+    def test_list_invalid_date_range_raises(self, service: ExpenseService):
+        with pytest.raises(InvalidDateRangeError):
+            service.list_expenses(
+                date_from=date(2025, 8, 31), date_to=date(2025, 8, 1)
+            )
+
     def test_list_pagination(self, service: ExpenseService):
         for i in range(5):
             service.create_expense(_make_payload(title=f"Item {i}"))
@@ -161,7 +171,7 @@ class TestGetSummary:
         assert summary.total_spending == 10.0
 
     def test_summary_future_month_raises(self, service: ExpenseService):
-        with pytest.raises(ValueError, match="Future year or month not allowed"):
+        with pytest.raises(FutureDateError, match="Future year or month not allowed"):
             service.get_summary(year=2099, month=12)
 
 
@@ -179,3 +189,9 @@ class TestListExpensesByCursor:
 
         assert len(page2) == 5
         assert next_cursor2 is None
+
+    def test_cursor_invalid_date_range_raises(self, service: ExpenseService):
+        with pytest.raises(InvalidDateRangeError):
+            service.list_expenses_by_cursor(
+                date_from=date(2025, 8, 31), date_to=date(2025, 8, 1)
+            )

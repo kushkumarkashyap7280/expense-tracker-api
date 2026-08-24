@@ -5,5 +5,10 @@ class ExpenseNotFoundError(Exception):
 
 
 class InvalidDateRangeError(Exception):
-    def __init__(self, message: str = "Invalid date range") -> None:
+    def __init__(self, message: str = "date_from cannot be after date_to") -> None:
+        super().__init__(message)
+
+
+class FutureDateError(Exception):
+    def __init__(self, message: str = "Future year or month not allowed") -> None:
         super().__init__(message)

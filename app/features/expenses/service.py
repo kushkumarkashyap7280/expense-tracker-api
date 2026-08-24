@@ -1,7 +1,11 @@
 from datetime import date
 from uuid import uuid4
 
-from app.features.expenses.exceptions import ExpenseNotFoundError
+from app.features.expenses.exceptions import (
+    ExpenseNotFoundError,
+    FutureDateError,
+    InvalidDateRangeError,
+)
 from app.features.expenses.models import Expense
 from app.features.expenses.repository import ExpenseRepository
 from app.features.expenses.schemas import (
@@ -46,6 +50,9 @@ class ExpenseService:
         skip: int = 0,
         limit: int = 100,
     ) -> list[Expense]:
+        if date_from and date_to and date_from > date_to:
+            raise InvalidDateRangeError("date_from cannot be after date_to")
+
         return self._repo.list_all(
             category=category,
             date_from=date_from,
@@ -57,7 +64,7 @@ class ExpenseService:
     def get_summary(self, year: int, month: int) -> ExpenseSummaryResponse:
         today = date.today()
         if year > today.year or (year == today.year and month > today.month):
-            raise ValueError("Future year or month not allowed")
+            raise FutureDateError("Future year or month not allowed")
 
         expenses = self._repo.get_by_month(year, month)
 
@@ -78,8 +85,11 @@ class ExpenseService:
         category: str | None = None,
         date_from: date | None = None,
         date_to: date | None = None,
-        limit: int = 10
+        limit: int = 10,
     ) -> tuple[list[Expense], str | None]:
+        if date_from and date_to and date_from > date_to:
+            raise InvalidDateRangeError("date_from cannot be after date_to")
+
         return self._repo.list_all_by_cursor(
             cursor_id=cursor_id,
             category=category,

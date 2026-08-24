@@ -3,13 +3,17 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.features.expenses.dependencies import get_expense_service
-from app.features.expenses.exceptions import ExpenseNotFoundError
+from app.features.expenses.exceptions import (
+    ExpenseNotFoundError,
+    FutureDateError,
+    InvalidDateRangeError,
+)
 from app.features.expenses.schemas import (
     ExpenseCreate,
+    ExpenseCursorResponse,
     ExpenseResponse,
     ExpenseSummaryResponse,
     ExpenseUpdate,
-    ExpenseCursorResponse
 )
 from app.features.expenses.service import ExpenseService
 
@@ -33,7 +37,7 @@ def get_summary(
 ):
     try:
         return service.get_summary(year, month)
-    except ValueError as exc:
+    except FutureDateError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
@@ -46,14 +50,16 @@ def list_expenses(
     limit: int = 100,
     service: ExpenseService = Depends(get_expense_service),
 ):
-    return service.list_expenses(
-        category=category,
-        date_from=date_from,
-        date_to=date_to,
-        skip=skip,
-        limit=limit,
-    )
-
+    try:
+        return service.list_expenses(
+            category=category,
+            date_from=date_from,
+            date_to=date_to,
+            skip=skip,
+            limit=limit,
+        )
+    except InvalidDateRangeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/cursor", response_model=ExpenseCursorResponse)
@@ -65,17 +71,20 @@ def list_expenses_by_cursor(
     limit: int = 10,
     service: ExpenseService = Depends(get_expense_service),
 ):
-    expenses, next_cursor = service.list_expenses_by_cursor(
-        cursor_id=cursor_id,
-        category=category,
-        date_from=date_from,
-        date_to=date_to,
-        limit=limit,
-    )
-    return {
-        "items": expenses,
-        "next_cursor": next_cursor,
-    }
+    try:
+        expenses, next_cursor = service.list_expenses_by_cursor(
+            cursor_id=cursor_id,
+            category=category,
+            date_from=date_from,
+            date_to=date_to,
+            limit=limit,
+        )
+        return {
+            "items": expenses,
+            "next_cursor": next_cursor,
+        }
+    except InvalidDateRangeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/{expense_id}", response_model=ExpenseResponse)
@@ -110,4 +119,3 @@ def delete_expense(
         return service.delete_expense(expense_id)
     except ExpenseNotFoundError:
         raise HTTPException(status_code=404, detail="Expense not found")
-

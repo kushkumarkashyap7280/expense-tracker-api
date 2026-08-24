@@ -69,6 +69,13 @@ class TestListEndpoint:
         assert len(data) == 1
         assert data[0]["category"] == "food"
 
+    def test_list_filter_invalid_date_range_returns_400(self, client: TestClient):
+        resp = client.get(
+            "/expenses",
+            params={"date_from": "2025-08-31", "date_to": "2025-08-01"},
+        )
+        assert resp.status_code == 400
+
     def test_list_pagination(self, client: TestClient):
         for i in range(5):
             client.post("/expenses", json=_expense_payload(title=f"E{i}"))
@@ -177,3 +184,10 @@ class TestListExpensesByCursorEndpoint:
 
         assert len(data2["items"]) == 5
         assert data2["next_cursor"] is None
+
+    def test_cursor_invalid_date_range_returns_400(self, client: TestClient):
+        resp = client.get(
+            "/expenses/cursor",
+            params={"date_from": "2025-08-31", "date_to": "2025-08-01"},
+        )
+        assert resp.status_code == 400
