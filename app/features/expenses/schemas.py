@@ -1,19 +1,19 @@
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ExpenseCreate(BaseModel):
-    title: str
-    amount: float
-    category: str
+    title: str = Field(..., min_length=1)
+    amount: float = Field(..., gt=0)
+    category: str = Field(..., min_length=1)
     date: date
     description: Optional[str] = None
 
 
 class ExpenseUpdate(BaseModel):
-    amount: Optional[float] = None
+    amount: Optional[float] = Field(None, gt=0)
     category: Optional[str] = None
     description: Optional[str] = None
 
@@ -35,6 +35,3 @@ class ExpenseSummaryResponse(BaseModel):
 class ExpenseCursorResponse(BaseModel):
     items: list[ExpenseResponse]
     next_cursor: Optional[str] = None
-
-
-
