@@ -1,8 +1,3 @@
-"""
-Unit tests for ExpenseService — uses InMemoryExpenseRepository (no mocking of
-owned code). Tests the service layer in isolation from HTTP concerns.
-"""
-
 from datetime import date
 
 import pytest
@@ -15,13 +10,11 @@ from tests.conftest import FakeExpenseRepository
 
 @pytest.fixture
 def service() -> ExpenseService:
-    """Fresh service with a fake repo for each test."""
     repo = FakeExpenseRepository()
     return ExpenseService(repository=repo)
 
 
 def _make_payload(**overrides) -> ExpenseCreate:
-    """Helper to build an ExpenseCreate with sensible defaults."""
     defaults = {
         "title": "Coffee",
         "amount": 4.50,
@@ -33,9 +26,6 @@ def _make_payload(**overrides) -> ExpenseCreate:
     return ExpenseCreate(**defaults)
 
 
-# ── Create ────────────────────────────────────────────────────────────
-
-
 class TestCreateExpense:
     def test_creates_and_returns_expense(self, service: ExpenseService):
         payload = _make_payload()
@@ -44,16 +34,13 @@ class TestCreateExpense:
         assert expense.title == "Coffee"
         assert expense.amount == 4.50
         assert expense.category == "food"
-        assert expense.id  # UUID was assigned
+        assert expense.id
 
     def test_create_with_description(self, service: ExpenseService):
         payload = _make_payload(description="Morning latte")
         expense = service.create_expense(payload)
 
         assert expense.description == "Morning latte"
-
-
-# ── Get by ID ─────────────────────────────────────────────────────────
 
 
 class TestGetExpense:
@@ -67,9 +54,6 @@ class TestGetExpense:
     def test_get_nonexistent_expense_raises(self, service: ExpenseService):
         with pytest.raises(ExpenseNotFoundError):
             service.get_expense("nonexistent-id")
-
-
-# ── List ──────────────────────────────────────────────────────────────
 
 
 class TestListExpenses:
@@ -109,9 +93,6 @@ class TestListExpenses:
         assert len(page) == 2
 
 
-# ── Update ────────────────────────────────────────────────────────────
-
-
 class TestUpdateExpense:
     def test_update_existing_expense(self, service: ExpenseService):
         created = service.create_expense(_make_payload(amount=10.0))
@@ -120,14 +101,11 @@ class TestUpdateExpense:
         )
 
         assert updated.amount == 20.0
-        assert updated.title == "Coffee"  # unchanged field preserved
+        assert updated.title == "Coffee"
 
     def test_update_nonexistent_raises(self, service: ExpenseService):
         with pytest.raises(ExpenseNotFoundError):
             service.update_expense("bad-id", ExpenseUpdate(amount=99.0))
-
-
-# ── Delete ────────────────────────────────────────────────────────────
 
 
 class TestDeleteExpense:
@@ -136,16 +114,12 @@ class TestDeleteExpense:
         deleted = service.delete_expense(created.id)
 
         assert deleted.id == created.id
-        # Verify it's actually gone
         with pytest.raises(ExpenseNotFoundError):
             service.get_expense(created.id)
 
     def test_delete_nonexistent_raises(self, service: ExpenseService):
         with pytest.raises(ExpenseNotFoundError):
             service.delete_expense("bad-id")
-
-
-# ── Summary ───────────────────────────────────────────────────────────
 
 
 class TestGetSummary:
@@ -189,3 +163,19 @@ class TestGetSummary:
     def test_summary_future_month_raises(self, service: ExpenseService):
         with pytest.raises(ValueError, match="Future year or month not allowed"):
             service.get_summary(year=2099, month=12)
+
+
+class TestListExpensesByCursor:
+    def test_cursor_pagination_flow(self, service: ExpenseService):
+        for i in range(15):
+            service.create_expense(_make_payload(title=f"Item {i}"))
+
+        page1, next_cursor = service.list_expenses_by_cursor(limit=10)
+
+        assert len(page1) == 10
+        assert next_cursor is not None
+
+        page2, next_cursor2 = service.list_expenses_by_cursor(cursor_id=next_cursor, limit=10)
+
+        assert len(page2) == 5
+        assert next_cursor2 is None

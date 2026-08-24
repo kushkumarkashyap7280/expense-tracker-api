@@ -99,3 +99,49 @@ class SupabaseExpenseRepository(ExpenseRepository):
             .execute()
         )
         return [self._row_to_expense(row) for row in result.data]
+    
+    def list_all_by_cursor(
+    self,
+    cursor_id: str | None = None,
+    category: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = 10,
+    ) -> tuple[list[Expense], str | None]:
+
+        query = self._client.table(self.TABLE).select("*")
+
+        
+        if category is not None:
+            query = query.eq("category", category)
+
+        if date_from is not None:
+            query = query.gte("date", date_from.isoformat())
+
+        if date_to is not None:
+            query = query.lte("date", date_to.isoformat())
+        
+        query = query.order("id") 
+        if cursor_id is not None:
+            query = query.gt("id", cursor_id)
+        
+        query = query.limit(limit + 1)
+
+        result = query.execute()
+
+        expenses = [self._row_to_expense(row) for row in result.data]
+        
+        next_cursor = None
+        if len(expenses) > limit:
+            expenses = expenses[:limit]
+            next_cursor = expenses[-1].id
+            
+
+
+        return (expenses, next_cursor )
+
+
+
+
+
+        

@@ -1,8 +1,3 @@
-"""
-Shared test fixtures — provides a FakeExpenseRepository that satisfies the
-abstract interface for testing without hitting Supabase.
-"""
-
 from datetime import date
 
 import pytest
@@ -12,8 +7,6 @@ from app.features.expenses.repository import ExpenseRepository
 
 
 class FakeExpenseRepository(ExpenseRepository):
-    """Test-only in-memory implementation of ExpenseRepository."""
-
     def __init__(self) -> None:
         self._store: list[dict] = []
 
@@ -69,3 +62,34 @@ class FakeExpenseRepository(ExpenseRepository):
             for r in self._store
             if r["date"].year == year and r["date"].month == month
         ]
+
+    def list_all_by_cursor(
+        self,
+        cursor_id: str | None = None,
+        category: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        limit: int = 10,
+    ) -> tuple[list[Expense], str | None]:
+        results = self._store
+
+        if category is not None:
+            results = [r for r in results if r["category"] == category]
+        if date_from is not None:
+            results = [r for r in results if r["date"] >= date_from]
+        if date_to is not None:
+            results = [r for r in results if r["date"] <= date_to]
+
+        results = sorted(results, key=lambda r: r["id"])
+
+        if cursor_id is not None:
+            results = [r for r in results if r["id"] > cursor_id]
+
+        expenses = [Expense(**r) for r in results]
+
+        next_cursor = None
+        if len(expenses) > limit:
+            expenses = expenses[:limit]
+            next_cursor = expenses[-1].id
+
+        return (expenses, next_cursor)

@@ -30,3 +30,11 @@ class ExpenseResponse(BaseModel):
 class ExpenseSummaryResponse(BaseModel):
     total_spending: float
     by_category: dict[str, float]
+
+
+class ExpenseCursorResponse(BaseModel):
+    items: list[ExpenseResponse]
+    next_cursor: Optional[str] = None
+
+
+

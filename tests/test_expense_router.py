@@ -1,11 +1,3 @@
-"""
-Integration tests for the expense router — uses FastAPI's TestClient with
-dependency_overrides to swap in an InMemoryExpenseRepository. Tests the full
-request → router → service → repo → response pipeline.
-"""
-
-from datetime import date
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -16,7 +8,6 @@ from tests.conftest import FakeExpenseRepository
 
 @pytest.fixture
 def client():
-    """TestClient with a fresh fake repo for each test."""
     test_repo = FakeExpenseRepository()
     app.dependency_overrides[get_repository] = lambda: test_repo
     yield TestClient(app)
@@ -24,7 +15,6 @@ def client():
 
 
 def _expense_payload(**overrides) -> dict:
-    """Default expense JSON payload."""
     defaults = {
         "title": "Lunch",
         "amount": 12.50,
@@ -33,9 +23,6 @@ def _expense_payload(**overrides) -> dict:
     }
     defaults.update(overrides)
     return defaults
-
-
-# ── POST /expenses ────────────────────────────────────────────────────
 
 
 class TestCreateEndpoint:
@@ -58,9 +45,6 @@ class TestCreateEndpoint:
     def test_create_missing_required_field_returns_422(self, client: TestClient):
         resp = client.post("/expenses", json={"title": "Oops"})
         assert resp.status_code == 422
-
-
-# ── GET /expenses ─────────────────────────────────────────────────────
 
 
 class TestListEndpoint:
@@ -93,9 +77,6 @@ class TestListEndpoint:
         assert len(resp.json()) == 2
 
 
-# ── GET /expenses/{id} ───────────────────────────────────────────────
-
-
 class TestGetByIdEndpoint:
     def test_get_existing(self, client: TestClient):
         create_resp = client.post("/expenses", json=_expense_payload())
@@ -110,9 +91,6 @@ class TestGetByIdEndpoint:
         assert resp.status_code == 404
 
 
-# ── PUT /expenses/{id} ───────────────────────────────────────────────
-
-
 class TestUpdateEndpoint:
     def test_update_existing(self, client: TestClient):
         create_resp = client.post("/expenses", json=_expense_payload(amount=10.0))
@@ -123,14 +101,11 @@ class TestUpdateEndpoint:
         )
         assert resp.status_code == 200
         assert resp.json()["amount"] == 25.0
-        assert resp.json()["title"] == "Lunch"  # unchanged
+        assert resp.json()["title"] == "Lunch"
 
     def test_update_nonexistent_returns_404(self, client: TestClient):
         resp = client.put("/expenses/bad-id", json={"amount": 99.0})
         assert resp.status_code == 404
-
-
-# ── DELETE /expenses/{id} ────────────────────────────────────────────
 
 
 class TestDeleteEndpoint:
@@ -142,15 +117,11 @@ class TestDeleteEndpoint:
         assert resp.status_code == 200
         assert resp.json()["id"] == expense_id
 
-        # Verify gone
         assert client.get(f"/expenses/{expense_id}").status_code == 404
 
     def test_delete_nonexistent_returns_404(self, client: TestClient):
         resp = client.delete("/expenses/bad-id")
         assert resp.status_code == 404
-
-
-# ── GET /expenses/summary ────────────────────────────────────────────
 
 
 class TestSummaryEndpoint:
@@ -184,3 +155,25 @@ class TestSummaryEndpoint:
     def test_summary_future_month_returns_400(self, client: TestClient):
         resp = client.get("/expenses/summary", params={"year": 2099, "month": 12})
         assert resp.status_code == 400
+
+
+class TestListExpensesByCursorEndpoint:
+    def test_cursor_pagination_http_flow(self, client: TestClient):
+        for i in range(15):
+            client.post("/expenses", json=_expense_payload(title=f"Expense {i}"))
+
+        resp1 = client.get("/expenses/cursor", params={"limit": 10})
+        assert resp1.status_code == 200
+        data1 = resp1.json()
+
+        assert len(data1["items"]) == 10
+        assert data1["next_cursor"] is not None
+
+        next_cursor = data1["next_cursor"]
+
+        resp2 = client.get("/expenses/cursor", params={"cursor_id": next_cursor, "limit": 10})
+        assert resp2.status_code == 200
+        data2 = resp2.json()
+
+        assert len(data2["items"]) == 5
+        assert data2["next_cursor"] is None

@@ -71,3 +71,19 @@ class ExpenseService:
             total_spending=round(sum(by_category.values()), 2),
             by_category=by_category,
         )
+
+    def list_expenses_by_cursor(
+        self,
+        cursor_id: str | None = None,
+        category: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        limit: int = 10
+    ) -> tuple[list[Expense], str | None]:
+        return self._repo.list_all_by_cursor(
+            cursor_id=cursor_id,
+            category=category,
+            date_from=date_from,
+            date_to=date_to,
+            limit=limit,
+        )

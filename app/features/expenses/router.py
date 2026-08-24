@@ -9,6 +9,7 @@ from app.features.expenses.schemas import (
     ExpenseResponse,
     ExpenseSummaryResponse,
     ExpenseUpdate,
+    ExpenseCursorResponse
 )
 from app.features.expenses.service import ExpenseService
 
@@ -54,6 +55,29 @@ def list_expenses(
     )
 
 
+
+@router.get("/cursor", response_model=ExpenseCursorResponse)
+def list_expenses_by_cursor(
+    cursor_id: str | None = None,
+    category: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = 10,
+    service: ExpenseService = Depends(get_expense_service),
+):
+    expenses, next_cursor = service.list_expenses_by_cursor(
+        cursor_id=cursor_id,
+        category=category,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+    )
+    return {
+        "items": expenses,
+        "next_cursor": next_cursor,
+    }
+
+
 @router.get("/{expense_id}", response_model=ExpenseResponse)
 def get_expense(
     expense_id: str,
@@ -86,3 +110,4 @@ def delete_expense(
         return service.delete_expense(expense_id)
     except ExpenseNotFoundError:
         raise HTTPException(status_code=404, detail="Expense not found")
+
