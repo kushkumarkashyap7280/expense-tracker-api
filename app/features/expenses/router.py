@@ -1,6 +1,7 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 
 from app.features.expenses.dependencies import get_expense_service
 from app.features.expenses.exceptions import (
@@ -31,13 +32,13 @@ def create_expense(
 
 @router.get("/summary", response_model=ExpenseSummaryResponse)
 def get_summary(
-    year: int,
-    month: int,
+    year: int = Query(..., ge=2000, description="4-digit year"),
+    month: int = Query(..., ge=1, le=12, description="Month from 1 to 12"),
     service: ExpenseService = Depends(get_expense_service),
 ):
     try:
         return service.get_summary(year, month)
-    except FutureDateError as exc:
+    except (FutureDateError, InvalidDateRangeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 

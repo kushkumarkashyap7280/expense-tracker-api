@@ -62,6 +62,10 @@ class ExpenseService:
         )
 
     def get_summary(self, year: int, month: int) -> ExpenseSummaryResponse:
+        
+        if month < 1 or month > 12:
+            raise InvalidDateRangeError("Month must be between 1 and 12")
+        
         today = date.today()
         if year > today.year or (year == today.year and month > today.month):
             raise FutureDateError("Future year or month not allowed")

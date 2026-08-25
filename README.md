@@ -154,10 +154,11 @@ API docs available at: [http://localhost:8000/docs](http://localhost:8000/docs)
 pytest tests/ -v
 ```
 
-All **39 automated tests** run against an in-memory `FakeExpenseRepository` — fast (~0.5s), isolated, and 100% deterministic:
+All **41 automated tests** run against an in-memory `FakeExpenseRepository` — fast (~0.5s), isolated, and 100% deterministic:
 
-- **`test_expense_service.py`** — 20 unit tests covering service logic, exceptions, math, and cursor pagination in isolation.
-- **`test_expense_router.py`** — 19 integration tests via `TestClient` verifying the full HTTP request/response pipeline and status codes.
+- **`test_expense_service.py`** — 21 unit tests covering service logic, exceptions, math, and cursor pagination in isolation.
+- **`test_expense_router.py`** — 20 integration tests via `TestClient` verifying the full HTTP request/response pipeline and status codes.
+
 
 ## Running with Docker (e.g. on Azure VM)
 

@@ -163,6 +163,13 @@ class TestSummaryEndpoint:
         resp = client.get("/expenses/summary", params={"year": 2099, "month": 12})
         assert resp.status_code == 400
 
+    def test_summary_invalid_month_returns_422(self, client: TestClient):
+        resp = client.get("/expenses/summary", params={"year": 2025, "month": 13})
+        assert resp.status_code == 422
+        resp_zero = client.get("/expenses/summary", params={"year": 2025, "month": 0})
+        assert resp_zero.status_code == 422
+
+
 
 class TestListExpensesByCursorEndpoint:
     def test_cursor_pagination_http_flow(self, client: TestClient):

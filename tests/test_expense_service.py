@@ -174,6 +174,13 @@ class TestGetSummary:
         with pytest.raises(FutureDateError, match="Future year or month not allowed"):
             service.get_summary(year=2099, month=12)
 
+    def test_summary_invalid_month_raises(self, service: ExpenseService):
+        with pytest.raises(InvalidDateRangeError, match="Month must be between 1 and 12"):
+            service.get_summary(year=2025, month=13)
+        with pytest.raises(InvalidDateRangeError, match="Month must be between 1 and 12"):
+            service.get_summary(year=2025, month=0)
+
+
 
 class TestListExpensesByCursor:
     def test_cursor_pagination_flow(self, service: ExpenseService):
