@@ -37,13 +37,11 @@ SupabaseExpenseRepository (Supabase / Postgres)
 ### Key Design Decisions
 
 - **Repository Pattern with ABC Interface**: Decouples business logic from database operations, making it trivial to swap storage engines or test with fast in-memory fakes.
-- **Dual Pagination Strategies**:
-  - **Offset Pagination (`GET /expenses`)**: Standard `skip` & `limit` for traditional numbered pages.
-  - **Cursor-Based Pagination (`GET /expenses/cursor`)**: Uses indexed seek (`id > cursor_id`) with the `limit + 1` trick for $O(1)$ performance on large datasets and data-drift prevention in infinite scroll feeds.
 - **Domain Exception Hierarchy**: The service raises domain exceptions (`ExpenseNotFoundError`, `FutureDateError`, `InvalidDateRangeError`), keeping it 100% transport-agnostic. The router catches and translates them into appropriate HTTP status codes (404, 400).
 - **Service Layer Aggregation & Precision**: Monthly summary calculation runs in the service layer (not a DB passthrough) and applies currency rounding (`round(..., 2)`) to eliminate floating-point precision errors.
 - **Constructor Injection & FastAPI `Depends`**: `ExpenseService` receives its repository via constructor, wired through FastAPI's dependency injection chain.
 - **Test Fakes (No Mocking of Owned Code)**: Tests use a `FakeExpenseRepository` in memory, ensuring test speed (~0.5s) and zero reliance on live third-party network connections.
+
 
 ## Project Structure
 
@@ -192,5 +190,5 @@ docker logs -f expense-tracker-api
 ## CI/CD Pipeline (GitHub Actions)
 
 A complete automated CI/CD pipeline is configured in `.github/workflows/deploy.yml`:
-1. On every `git push` to `main`, GitHub Actions automatically installs dependencies and runs the entire **39-test test suite**.
+1. On every `git push` to `main`, GitHub Actions automatically installs dependencies and runs the entire **41-test test suite**.
 2. If all tests pass, GitHub Actions connects to the **Azure VM via SSH**, pulls the latest changes, and rebuilds the Docker container with zero downtime.
